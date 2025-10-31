@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🚪 Door Control Realtime</title>
+        <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+        <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        background: linear-gradient(to bottom right, #eef6ff, #cbe1ff);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      h1 {
+        color: #004aad;
+      }
+      .status {
+        font-size: 1.5em;
+        margin: 15px;
+        color: #333;
+      }
+      button {
+        font-size: 1.2em;
+        padding: 10px 20px;
+        margin: 10px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .lock {
+        background: #e74c3c;
+        color: white;
+      }
+      .unlock {
+        background: #2ecc71;
+        color: white;
+      }
+      button:hover {
+        opacity: 0.8;
+        transform: scale(1.05);
+      }
+    </style>
+    </head>
+    <body>
+        <h1>🔐 Door Lock Realtime</h1>
+        <div class="status">
+            Trạng thái cửa: <b id="door-status">Đang kết nối...</b>
+        </div>
+        <div>
+            <button class="lock" id="btn-lock">🔒 Khoá cửa</button>
+            <button class="unlock" id="btn-unlock">🔓 Mở cửa</button>
+        </div>
+
+        <script>
+      // 🔧 Đổi IP này thành IP máy chạy Mosquitto (vd 192.168.1.8)
+      ip='192.168.1.8'
+      const brokerUrl = `ws://${ip}:9001/mqtt`;
+      const topicStatus = "demo/door/status";
+      const topicCommand = "demo/door/command";
+
+      const statusEl = document.getElementById("door-status");
+      const lockBtn = document.getElementById("btn-lock");
+      const unlockBtn = document.getElementById("btn-unlock");
+
+      // Kết nối tới broker
+      const client = mqtt.connect(brokerUrl);
+
+      client.on("connect", () => {
+        console.log("✅ Đã kết nối MQTT");
+        statusEl.textContent = "🟢 Đã kết nối MQTT";
+        client.subscribe(topicStatus);
+      });
+
+      client.on("message", (topic, payload) => {
+        if (topic !== topicStatus) return;
+        const msg = payload.toString();
+        console.log("📩 MQTT:", msg);
+
+        if (msg === "LOCKED") {
+          statusEl.textContent = "🔒 Cửa đang ĐÓNG";
+          statusEl.style.color = "red";
+        } else if (msg === "UNLOCKED") {
+          statusEl.textContent = "🔓 Cửa đang MỞ";
+          statusEl.style.color = "green";
+        } else if (msg === "WRONG_PASSWORD") {
+          statusEl.textContent = "⚠️ Sai mật khẩu!";
+          statusEl.style.color = "orange";
+        } else if (msg === "INTRUSION_ALERT") {
+          statusEl.textContent = "🚨 Báo động!";
+          statusEl.style.color = "crimson";
+        } else {
+          statusEl.textContent = msg;
+          statusEl.style.color = "#333";
+        }
+      });
+
+      client.on("error", (err) => {
+        console.error("❌ MQTT error:", err);
+        statusEl.textContent = "Lỗi MQTT – kiểm tra brokerUrl";
+        statusEl.style.color = "gray";
+      });
+
+      // Gửi lệnh từ web
+      lockBtn.onclick = () => {
+        client.publish(topicCommand, "LOCK");
+        console.log("🔒 gửi lệnh LOCK");
+      };
+
+      unlockBtn.onclick = () => {
+        client.publish(topicCommand, "UNLOCK");
+        console.log("🔓 gửi lệnh UNLOCK");
+      };
+    </script>
+    </body>
+</html>

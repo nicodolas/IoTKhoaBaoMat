@@ -39,6 +39,13 @@
       "top": 40,
       "left": 220,
       "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer1",
+      "top": 220,
+      "left": 260,
+      "attrs": { "pin": "15" }
     }
   ],
   "connections": [
@@ -60,7 +67,9 @@
     [ "ledGreen:C", "esp:GND.2", "black", [ "v0" ] ],
     [ "rRed:1", "ledRed:A", "red", [ "v0" ] ],
     [ "rRed:2", "esp:23", "red", [ "v0" ] ],
-    [ "ledRed:C", "esp:GND.2", "black", [ "v0" ] ]
+    [ "ledRed:C", "esp:GND.2", "black", [ "v0" ] ],
+    [ "buzzer1:1", "esp:15", "blue", [ "v0" ] ],
+    [ "buzzer1:2", "esp:GND.2", "black", [ "v0" ] ]
   ],
   "dependencies": {}
 }

@@ -1,0 +1,5 @@
+arduino-cli compile --fqbn esp32:esp32:esp32 Demo_IOT.ino --output-dir build
+
+
+cd "C:\Program Files\mosquitto" 
+mosquitto -v -c mosquitto.conf

@@ -2,3 +2,4 @@
 version = 1
 firmware = "build/Demo_IOT.ino.elf"
 elf = "build/Demo_IOT.ino.elf"
+network = "host"
