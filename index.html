@@ -1,120 +1,248 @@
 <!DOCTYPE html>
 <html lang="vi">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>🚪 Door Control Realtime</title>
-        <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-        <style>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>🔒 Smart Lock – ESP32 MQTT Dashboard (Auto Connect)</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+      :root {
+        --primary: #2196f3;
+        --primary-2: #1976d2;
+        --accent: #64b5f6;
+        --ok: #00c853;
+        --warn: #ffd600;
+        --err: #d50000;
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --text: #0b1b2b;
+        --muted: #6b7a90;
+        --shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; }
       body {
-        font-family: "Segoe UI", sans-serif;
-        background: linear-gradient(to bottom right, #eef6ff, #cbe1ff);
-        height: 100vh;
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: linear-gradient(180deg, #f7fbff 0%, #eef5fd 100%);
+        color: var(--text);
+      }
+      header {
+        background: linear-gradient(90deg, var(--primary-2), var(--accent));
+        color: #fff;
+        padding: 18px 20px;
         display: flex;
-        flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
+        box-shadow: var(--shadow);
+        position: sticky;
+        top: 0;
+        z-index: 5;
       }
-      h1 {
-        color: #004aad;
+      header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+      header .sub { font-size: 12px; opacity: 0.9; }
+      .container { max-width: 1100px; margin: 20px auto; padding: 0 16px 40px; }
+      .grid { display: grid; gap: 16px; }
+      .g-3 { grid-template-columns: repeat(3, 1fr); }
+      @media (max-width: 900px) { .g-3 { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 640px) { .g-3 { grid-template-columns: 1fr; } }
+      .card {
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 16px;
       }
-      .status {
-        font-size: 1.5em;
-        margin: 15px;
-        color: #333;
+      .section-title {
+        font-size: 14px; font-weight: 700; color: var(--primary-2); margin: 0 0 12px;
       }
-      button {
-        font-size: 1.2em;
-        padding: 10px 20px;
-        margin: 10px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s ease;
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .pill {
+        padding: 8px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+        background: #eef4ff; color: var(--primary-2); border: 1px solid #e2ecff;
       }
-      .lock {
-        background: #e74c3c;
-        color: white;
+      .status-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 14px; border-radius: 12px;
+        font-size: 14px; font-weight: 700; color: #fff;
+        box-shadow: var(--shadow);
       }
-      .unlock {
-        background: #2ecc71;
-        color: white;
+      .status-ok { background: linear-gradient(90deg, #00c853, #00e676); }
+      .status-warn { background: linear-gradient(90deg, #ffab00, #ffd600); color: #2b2100; }
+      .status-err { background: linear-gradient(90deg, #d50000, #ff1744); }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: #fff; opacity: 0.9; }
+      .controls .btn {
+        appearance: none; border: none; background: var(--primary); color: #fff;
+        font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer;
+        box-shadow: var(--shadow); transition: transform 0.06s ease;
       }
-      button:hover {
-        opacity: 0.8;
-        transform: scale(1.05);
+      .controls .btn:hover { transform: translateY(-1px); }
+      .btn.secondary {
+        background: #fff; color: var(--primary-2); border: 1px solid #d7e5ff;
       }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { padding: 10px 8px; border-bottom: 1px solid #eef2f9; text-align: left; }
+      th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+      .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+      .tag.ok { background: #e8f7ee; color: #0a7d3a; }
+      .tag.err { background: #ffebee; color: #b71c1c; }
+      .tag.warn { background: #fff8e1; color: #8d6e00; }
+      .muted { color: var(--muted); }
+      .toast-wrap {
+        position: fixed; right: 16px; top: 16px; display: flex; flex-direction: column;
+        gap: 10px; z-index: 10;
+      }
+      .toast {
+        min-width: 260px; background: #fff; border-left: 6px solid var(--primary);
+        box-shadow: var(--shadow); border-radius: 10px; padding: 12px 14px;
+        animation: slideIn 0.18s ease;
+      }
+      .toast.ok { border-color: var(--ok); }
+      .toast.err { border-color: var(--err); }
+      .toast.warn { border-color: var(--warn); }
+      @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-    </head>
-    <body>
-        <h1>🔐 Door Lock Realtime</h1>
-        <div class="status">
-            Trạng thái cửa: <b id="door-status">Đang kết nối...</b>
+  </head>
+
+  <body>
+    <header>
+      <div>
+        <h1>🔒 Hệ thống khóa bảo mật IoT</h1>
+        <div class="sub">ESP32 • Keypad • Servo • LED • Buzzer •
+          MQTT/WebSocket</div>
+      </div>
+      <div class="row"><span id="conn-badge" class="pill">MQTT:
+          Disconnected</span></div>
+    </header>
+
+    <div class="container">
+      <div class="grid g-3">
+        <div class="card">
+          <h3 class="section-title">Trạng thái hiện tại</h3>
+          <div id="statusBadge" class="status-badge status-warn">
+            <span class="dot"></span><span id="statusText">Đang chờ dữ
+              liệu…</span>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div><b>✅ Hợp lệ:</b> <span id="kOk">0</span></div>
+            <div><b>⚠️ Sai mật khẩu:</b> <span id="kWrong">0</span></div>
+            <div><b>🚨 Báo động:</b> <span id="kAlert">0</span></div>
+          </div>
         </div>
-        <div>
-            <button class="lock" id="btn-lock">🔒 Khoá cửa</button>
-            <button class="unlock" id="btn-unlock">🔓 Mở cửa</button>
+
+        <div class="card">
+          <h3 class="section-title">Điều khiển từ xa</h3>
+          <div class="row controls">
+            <button class="btn" data-cmd="LOCK">🔐 Khóa</button>
+            <button class="btn" data-cmd="UNLOCK">🔓 Mở</button>
+            <button class="btn secondary" data-cmd="SIREN">🚨 Bật còi</button>
+          </div>
         </div>
 
-        <script>
-      // 🔧 Đổi IP này thành IP máy chạy Mosquitto (vd 192.168.1.8)
-      ip='192.168.1.8'
-      const brokerUrl = `ws://${ip}:9001/mqtt`;
-      const topicStatus = "demo/door/status";
-      const topicCommand = "demo/door/command";
+        <div class="card">
+          <h3 class="section-title">Âm báo</h3>
+          <div class="row controls">
+            <button class="btn secondary" id="test-ok">Test "bíp" OK</button>
+            <button class="btn secondary" id="test-warn">Test "bíp" sai</button>
+            <button class="btn secondary" id="test-alert">Test còi dài</button>
+          </div>
+        </div>
+      </div>
 
-      const statusEl = document.getElementById("door-status");
-      const lockBtn = document.getElementById("btn-lock");
-      const unlockBtn = document.getElementById("btn-unlock");
+      <div class="card" style="margin-top:12px">
+        <h3 class="section-title">Lịch sử sự kiện</h3>
+        <table>
+          <thead><tr><th>Thời gian</th><th>Sự kiện</th><th>Chi
+                tiết</th><th>Loại</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
 
-      // Kết nối tới broker
-      const client = mqtt.connect(brokerUrl);
+    <div class="toast-wrap" id="toasts"></div>
 
-      client.on("connect", () => {
-        console.log("✅ Đã kết nối MQTT");
-        statusEl.textContent = "🟢 Đã kết nối MQTT";
-        client.subscribe(topicStatus);
-      });
+    <script>
+      
+      ip='172.17.66.131'
+      const broker = `ws://${ip}:9001/mqtt`;
+      const topicSub = "demo/door/status";
+      const topicPub = "demo/door/command";
 
-      client.on("message", (topic, payload) => {
-        if (topic !== topicStatus) return;
-        const msg = payload.toString();
-        console.log("📩 MQTT:", msg);
+      // Audio test
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      document.addEventListener("click", () => {
+        if (audioCtx.state === "suspended") audioCtx.resume();
+      }, { once: true });
 
-        if (msg === "LOCKED") {
-          statusEl.textContent = "🔒 Cửa đang ĐÓNG";
-          statusEl.style.color = "red";
-        } else if (msg === "UNLOCKED") {
-          statusEl.textContent = "🔓 Cửa đang MỞ";
-          statusEl.style.color = "green";
-        } else if (msg === "WRONG_PASSWORD") {
-          statusEl.textContent = "⚠️ Sai mật khẩu!";
-          statusEl.style.color = "orange";
-        } else if (msg === "INTRUSION_ALERT") {
-          statusEl.textContent = "🚨 Báo động!";
-          statusEl.style.color = "crimson";
-        } else {
-          statusEl.textContent = msg;
-          statusEl.style.color = "#333";
-        }
-      });
-
-      client.on("error", (err) => {
-        console.error("❌ MQTT error:", err);
-        statusEl.textContent = "Lỗi MQTT – kiểm tra brokerUrl";
-        statusEl.style.color = "gray";
-      });
-
-      // Gửi lệnh từ web
-      lockBtn.onclick = () => {
-        client.publish(topicCommand, "LOCK");
-        console.log("🔒 gửi lệnh LOCK");
+      const beep = (f, d) => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.value = f; g.gain.value = 0.05;
+        o.connect(g).connect(audioCtx.destination);
+        o.start(); setTimeout(()=>o.stop(), d);
+      };
+      const chirpOK = ()=>{ beep(1200,100); setTimeout(()=>beep(1500,100),90); };
+      const chirpWrong = ()=>{ beep(300,120); setTimeout(()=>beep(260,120),120); };
+      const siren = (ms=2000)=>{
+        const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+        g.gain.value=0.05; o.type="sawtooth"; o.connect(g).connect(audioCtx.destination);
+        o.start(); const start=audioCtx.currentTime;
+        const loop=()=>{ const t=audioCtx.currentTime-start, f=600+400*Math.sin(2*Math.PI*t*2);
+          o.frequency.setValueAtTime(f,audioCtx.currentTime);
+          if(t<ms/1000)requestAnimationFrame(loop); else o.stop(); }; loop();
       };
 
-      unlockBtn.onclick = () => {
-        client.publish(topicCommand, "UNLOCK");
-        console.log("🔓 gửi lệnh UNLOCK");
+      const $ = id => document.getElementById(id);
+      const logBody = $("logBody"), kOk=$("kOk"), kWrong=$("kWrong"), kAlert=$("kAlert");
+      const statusText=$("statusText"), statusBadge=$("statusBadge"), toasts=$("toasts");
+      const connBadge=$("conn-badge");
+
+      let okCount=0, wrongCount=0, alertCount=0;
+      const toast=(t,m,type="ok",time=4000)=>{
+        const el=document.createElement("div");
+        el.className=`toast ${type}`; el.innerHTML=`<h4>${t}</h4><p>${m}</p>`;
+        toasts.appendChild(el); setTimeout(()=>{el.style.opacity=0;setTimeout(()=>el.remove(),300)},time);
       };
+      const addLog=(ev,detail,type)=>{
+        const tr=document.createElement("tr");
+        const now=new Date().toLocaleString();
+        tr.innerHTML=`<td>${now}</td><td>${ev}</td><td class="muted">${detail||""}</td>
+          <td>${type==="ok"?"<span class='tag ok'>OK</span>":type==="err"?"<span class='tag err'>ERR</span>":"<span class='tag warn'>WARN</span>"}</td>`;
+        logBody.prepend(tr);
+      };
+      const setStatus=(type,txt)=>{
+        statusBadge.className="status-badge "+(type==="ok"?"status-ok":type==="err"?"status-err":"status-warn");
+        statusText.textContent=txt;
+      };
+
+      // MQTT
+      const client=mqtt.connect(broker,{clientId:"web-"+Math.random().toString(16).slice(2)});
+      client.on("connect",()=>{
+        connBadge.textContent="🟢 MQTT Connected";
+        client.subscribe(topicSub);
+        toast("Kết nối MQTT","Đã kết nối "+broker,"ok");
+        addLog("Connect",broker,"ok");
+      });
+      client.on("error",e=>toast("Lỗi MQTT",e.message,"err"));
+      client.on("close",()=>connBadge.textContent="⚪ Disconnected");
+
+      client.on("message",(t,p)=>{
+        const msg=p.toString().trim();
+        if(msg==="UNLOCKED"){ okCount++; kOk.textContent=okCount; setStatus("ok","Cửa MỞ"); chirpOK(); toast("✅ Mở cửa","Access granted","ok"); addLog("Door unlocked","UNLOCKED","ok"); }
+        else if(msg==="LOCKED"){ setStatus("warn","Cửa ĐÓNG"); addLog("Door locked","LOCKED","warn"); }
+        else if(msg==="WRONG_PASSWORD"){ wrongCount++; kWrong.textContent=wrongCount; setStatus("warn","Sai mật khẩu"); chirpWrong(); toast("❌ Sai mật khẩu","Wrong password","warn"); addLog("Wrong password","WRONG_PASSWORD","warn"); }
+        else if(msg==="INTRUSION_ALERT"){ alertCount++; kAlert.textContent=alertCount; setStatus("err","Cảnh báo xâm nhập"); siren(2200); toast("🚨 Báo động","Intrusion alert","err"); addLog("Intrusion","INTRUSION_ALERT","err"); }
+      });
+
+      // Buttons
+      document.querySelectorAll("[data-cmd]").forEach(b=>b.addEventListener("click",()=>{
+        const cmd=b.getAttribute("data-cmd");
+        client.publish(topicPub,cmd);
+        addLog("Publish",cmd,"ok");
+        toast("Gửi lệnh",cmd,"ok",2000);
+      }));
+      $("test-ok").onclick=chirpOK;
+      $("test-warn").onclick=chirpWrong;
+      $("test-alert").onclick=()=>siren(1500);
     </script>
-    </body>
+  </body>
 </html>

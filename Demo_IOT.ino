@@ -5,7 +5,7 @@
 
 const char *ssid = "Wokwi-GUEST";
 const char *password = "";
-const char *mqtt_server = "192.168.1.8"; // ⚠️ đổi đúng IP máy bạn
+const char *mqtt_server = "172.17.66.131";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -13,19 +13,18 @@ PubSubClient client(espClient);
 // ====== Keypad setup ======
 const byte ROWS = 4, COLS = 4;
 char keys[ROWS][COLS] = {
-  {'1','2','3','A'},
-  {'4','5','6','B'},
-  {'7','8','9','C'},
-  {'*','0','#','D'}
-};
-byte rowPins[ROWS] = {19,18,5,17};
-byte colPins[COLS] = {16,4,0,2};
+    {'1', '2', '3', 'A'},
+    {'4', '5', '6', 'B'},
+    {'7', '8', '9', 'C'},
+    {'*', '0', '#', 'D'}};
+byte rowPins[ROWS] = {19, 18, 5, 17};
+byte colPins[COLS] = {16, 4, 0, 2};
 Keypad keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 // ====== Servo + GPIO ======
 Servo doorServo;
 int greenLED = 22;
-int redLED   = 23;
+int redLED = 23;
 int buzzerPin = 15;
 
 // ====== MQTT topics ======
@@ -47,50 +46,67 @@ void toneSuccess();
 void toneError();
 
 // ====== MQTT callback ======
-void callback(char *topic, byte *payload, unsigned int length) {
+void callback(char *topic, byte *payload, unsigned int length)
+{
   String msg;
-  for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
+  for (unsigned int i = 0; i < length; i++)
+    msg += (char)payload[i];
   Serial.printf("[MQTT] %s -> %s\n", topic, msg.c_str());
 
-  if (msg == "LOCK") {
+  if (msg == "LOCK")
+  {
     Serial.println("🔒 Khoá từ web");
     lockDoor();
-  } else if (msg == "UNLOCK") {
+  }
+  else if (msg == "UNLOCK")
+  {
     Serial.println("🔓 Mở từ web");
     unlockDoor();
-  } else if (msg == "SIREN") {
+  }
+  else if (msg == "SIREN")
+  {
     Serial.println("🚨 Siren triggered manually!");
     alarmBuzzer();
   }
 }
 
 // ====== WiFi + MQTT setup ======
-void setup_wifi() {
+void setup_wifi()
+{
   WiFi.begin(ssid, password);
   Serial.print("WiFi...");
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(400);
     Serial.print(".");
   }
   Serial.println("\n✅ WiFi connected!");
-  Serial.print("IP: "); Serial.println(WiFi.localIP());
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
 }
 
-void reconnect() {
-  while (!client.connected()) {
+void reconnect()
+{
+  while (!client.connected())
+  {
     Serial.print("MQTT...");
-    if (client.connect("ESP32_Lock")) {
+    if (client.connect("ESP32_Lock"))
+    {
       Serial.println("connected!");
       client.subscribe(topic_cmd);
-    } else {
-      Serial.print("fail, rc="); Serial.println(client.state());
+    }
+    else
+    {
+      Serial.print("fail, rc=");
+      Serial.println(client.state());
       delay(2000);
     }
   }
 }
 
 // ====== Door control ======
-void lockDoor() {
+void lockDoor()
+{
   digitalWrite(greenLED, LOW);
   digitalWrite(redLED, HIGH);
   doorServo.write(0);
@@ -99,7 +115,8 @@ void lockDoor() {
   Serial.println("🔒 Door locked");
 }
 
-void unlockDoor() {
+void unlockDoor()
+{
   digitalWrite(redLED, LOW);
   digitalWrite(greenLED, HIGH);
   doorServo.write(90);
@@ -110,7 +127,8 @@ void unlockDoor() {
 }
 
 // ====== Âm thanh phản hồi ======
-void toneSuccess() {
+void toneSuccess()
+{
   // Hai âm ngắn cao độ tăng dần
   tone(buzzerPin, 1200, 100);
   delay(120);
@@ -119,7 +137,8 @@ void toneSuccess() {
   noTone(buzzerPin);
 }
 
-void toneError() {
+void toneError()
+{
   // Hai âm trầm ngắn
   tone(buzzerPin, 400, 150);
   delay(200);
@@ -128,10 +147,12 @@ void toneError() {
   noTone(buzzerPin);
 }
 
-void alarmBuzzer() {
+void alarmBuzzer()
+{
   Serial.println("🚨 Intrusion detected! Triggering alarm...");
   client.publish(topic_status, "INTRUSION_ALERT");
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     tone(buzzerPin, 800);
     delay(1000);
     noTone(buzzerPin);
@@ -141,7 +162,8 @@ void alarmBuzzer() {
 }
 
 // ====== Setup ======
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
@@ -157,27 +179,35 @@ void setup() {
 }
 
 // ====== Loop ======
-void loop() {
-  if (!client.connected()) reconnect();
+void loop()
+{
+  if (!client.connected())
+    reconnect();
   client.loop();
 
   // Auto-lock sau 5 giây
-  if (isUnlocked && millis() - lastUnlockTime >= 5000) {
+  if (isUnlocked && millis() - lastUnlockTime >= 5000)
+  {
     Serial.println("⏳ Auto lock  after 5s");
     lockDoor();
   }
 
   char key = keypad.getKey();
-  if (key) {
+  if (key)
+  {
     tone(buzzerPin, 1000, 60); // tiếng phím bấm
-    if (key == '#') {
+    if (key == '#')
+    {
       Serial.printf("Entered: %s\n", inputCode.c_str());
-      if (inputCode == correctCode) {
+      if (inputCode == correctCode)
+      {
         wrongCount = 0;
         Serial.println("✅ Correct code");
         toneSuccess();
         unlockDoor();
-      } else {
+      }
+      else
+      {
         wrongCount++;
         Serial.printf("❌ Wrong code (%d/3)\n", wrongCount);
         toneError();
@@ -186,16 +216,21 @@ void loop() {
         delay(100);
         digitalWrite(redLED, LOW);
 
-        if (wrongCount >= 3) {
+        if (wrongCount >= 3) // 3 lần sai mã liên tiếp sẽ kích hoạt báo động
+        {
           alarmBuzzer();
           wrongCount = 0;
         }
       }
       inputCode = "";
-    } else if (key == '*') {
+    }
+    else if (key == '*')
+    {
       inputCode = "";
       Serial.println("Cleared input");
-    } else {
+    }
+    else
+    {
       inputCode += key;
     }
   }
